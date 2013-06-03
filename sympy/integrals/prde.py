@@ -29,7 +29,7 @@ from sympy.integrals.risch import (gcdex_diophantine, frac_in, derivation,
     residue_reduce_derivation, DecrementLevel, recognize_log_derivative)
 from sympy.integrals.rde import (order_at, order_at_oo, weak_normalizer,
     bound_degree, spde, solve_poly_rde)
-
+from sympy.mpmath import nsum
 
 def prde_normal_denom(fa, fd, G, DE):
     """
@@ -63,14 +63,14 @@ def real_imag(ba, bd, gen):
 
     bd = bd.as_poly(gen).as_dict()
     ba = ba.as_poly(gen).as_dict()
-    denom_real = [value if key[0]%4==0 else -value if key[0]%4==2 else 0 for key, value in bd.items()]
-    denom_imag = [value if key[0]%4==1 else -value if key[0]%4==3 else 0 for key, value in bd.items()]
-    bd_real = reduce(lambda x, y: x + y, denom_real, 0)
-    bd_imag = reduce(lambda x, y: x + y, denom_imag, 0)
-    num_real = [value if key[0]%4==0 else -value if key[0]%4==2 else 0 for key, value in ba.items()]
-    num_imag = [value if key[0]%4==1 else -value if key[0]%4==3 else 0 for key, value in ba.items()]
-    ba_real = reduce(lambda x, y: x + y, num_real, 0)
-    ba_imag = reduce(lambda x, y: x + y, num_imag, 0)
+    denom_real = [value if key[0] % 4 == 0 else -value if key[0] % 4 == 2 else 0 for key, value in bd.items()]
+    denom_imag = [value if key[0] % 4 == 1 else -value if key[0] % 4 == 3 else 0 for key, value in bd.items()]
+    bd_real = nsum(lambda x: x, denom_real)
+    bd_imag = nsum(lambda x: x, denom_imag)
+    num_real = [value if key[0] % 4 == 0 else -value if key[0] % 4 == 2 else 0 for key, value in ba.items()]
+    num_imag = [value if key[0] % 4 == 1 else -value if key[0] % 4 == 3 else 0 for key, value in ba.items()]
+    ba_real = nsum(lambda x: x, num_real)
+    ba_imag = nsum(lambda x: x, num_imag)
     ba = ((ba_real*bd_real + ba_imag*bd_imag).as_poly(), (ba_imag*bd_real - ba_real*bd_imag).as_poly())
     bd = (bd_real*bd_real + bd_imag*bd_imag).as_poly()
     return (ba[0], ba[1], bd)
@@ -130,7 +130,7 @@ def prde_special_denom(a, ba, bd, G, DE, case='auto'):
             dcoeff = DE.d.quo(Poly(DE.t**2+1, DE.t))
             with DecrementLevel(DE):  # We are guaranteed to not have problems,
                                       # because case != 'base'.
-                betaa, alphaa, alphad =  real_imag(ba, bd*a, DE.t)
+                betaa, alphaa, alphad =  real_imag(-ba, bd*a, DE.t)
                 betad = alphad
                 etaa, etad = frac_in(dcoeff, DE.t)
                 if recognize_log_derivative(2*betaa, betad, DE):
@@ -723,13 +723,15 @@ def is_log_deriv_k_t_radical(fa, fd, DE, Df=True):
     To handle the case where we are given Df, not f, use
     is_log_deriv_k_t_radical_in_field().
     """
+    T_part = [DE.D[i].quo(Poly(DE.T[i], DE.T[i])).as_expr() for i in DE.T_K]
+    print T_part
+    print DE.cases
     H = []
     if Df:
         dfa, dfd = (fd*derivation(fa, DE) - fa*derivation(fd, DE)).cancel(fd**2,
             include=True)
     else:
         dfa, dfd = fa, fd
-
     # Our assumption here is that each monomial is recursively transcendental
     if len(DE.L_K) + len(DE.E_K) != len(DE.D) - 1:
         if filter(lambda i: i == 'tan', DE.cases) or \
